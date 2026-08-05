@@ -69,7 +69,7 @@ elif [[ $DEVICE == @(stallion|tegu|comet|komodo|caiman|tokay|akita|husky|shiba|f
     DISABLE_UART=true
     DISABLE_FIPS=true
     DISABLE_DPM=true
-    OTA_ARGS=
+    OTA_ARGS=--enable_replace_zstd=true
 else
     user_error "$DEVICE is not supported by the release script"
 fi
@@ -187,23 +187,25 @@ ota_from_target_files -k "$KEY_DIR/releasekey" $OTA_ARGS $TARGET_FILES \
     $DEVICE-ota_update-$BUILD_NUMBER.zip
 script/generate-metadata $DEVICE-ota_update-$BUILD_NUMBER.zip
 
-img_from_target_files $TARGET_FILES $DEVICE-img-$BUILD_NUMBER.zip
+if [[ -z $SKIP_FACTORY_IMAGES ]]; then
+    img_from_target_files $TARGET_FILES $DEVICE-img-$BUILD_NUMBER.zip
 
-source device/common/generate-factory-images-common.sh
+    source device/common/generate-factory-images-common.sh
 
-if [[ $DEVICE == @(yogi|kodiak|grizzly|cubs) ]]; then
-    MAX_DOWNLOAD_SIZE=0x20000000
-elif [[ $DEVICE == @(rango|mustang|blazer|frankel) ]]; then
-    MAX_DOWNLOAD_SIZE=0x10000000
-else
-    MAX_DOWNLOAD_SIZE=0xf900000
-fi
+    if [[ $DEVICE == @(yogi|kodiak|grizzly|cubs) ]]; then
+        MAX_DOWNLOAD_SIZE=0x20000000
+    elif [[ $DEVICE == @(rango|mustang|blazer|frankel) ]]; then
+        MAX_DOWNLOAD_SIZE=0x10000000
+    else
+        MAX_DOWNLOAD_SIZE=0xf900000
+    fi
 
-# Second arg to optimize-factory-image is the name of outer zip directory.
-# Output zip name defaults to <outer zip dir name>.zip
-fastboot -S $MAX_DOWNLOAD_SIZE optimize-factory-image $DEVICE-factory-$BUILD_NUMBER.zip $DEVICE-install-$BUILD_NUMBER
+    # Second arg to optimize-factory-image is the name of outer zip directory.
+    # Output zip name defaults to <outer zip dir name>.zip
+    fastboot -S $MAX_DOWNLOAD_SIZE optimize-factory-image $DEVICE-factory-$BUILD_NUMBER.zip $DEVICE-install-$BUILD_NUMBER
 
-if [[ -f "$KEY_DIR/id_ed25519" ]]; then
-    export PATH="$OLD_PATH"
-    ssh-keygen -Y sign -n "factory images" -f "$KEY_DIR/id_ed25519" $DEVICE-install-$BUILD_NUMBER.zip
+    if [[ -f "$KEY_DIR/id_ed25519" ]]; then
+        export PATH="$OLD_PATH"
+        ssh-keygen -Y sign -n "factory images" -f "$KEY_DIR/id_ed25519" $DEVICE-install-$BUILD_NUMBER.zip
+    fi
 fi
